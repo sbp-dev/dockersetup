@@ -1,0 +1,66 @@
+name: pt
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip:
+      # Core DL libraries
+      - torch 
+      - torchvision 
+      - torchaudio
+      - lightning 
+      - torchinfo
+      - torchmetrics 
+      - segmentation-models-pytorch
+      - timm
+      - keras
+      - keras-core
+        # keras-hub
+        # keras-cv
+      # Core ML libraries
+      - numpy 
+      - pandas
+      - scikit-learn 
+      - pycaret
+      - statsmodels 
+      - matplotlib
+      - mlflow
+      # CV libraries
+      - opencv-contrib-python-headless
+      - pillow
+      - scikit-image
+      - albumentations
+      - imagehash
+      # Webserver related
+      - flask
+      - fastapi
+      - uvicorn
+      - streamlit
+      - requests
+      - requests-oauthlib
+      - oauthlib
+      # Inferencing
+      - onnx
+      - onnxruntime-gpu 
+      - skl2onnx 
+      ## Azure and databases
+      # - azure-storage-blob 
+      # - azure-ai-ml
+      # - azure-identity
+      # - azureml-core
+      # - azureml-sdk 
+      # - azureml-fsspec
+      # - mltable 
+      # - pymongo
+      # Other must-haves
+      - ipykernel
+      - tqdm
+      # Good to haves
+        # dask
+      - tensorboard
+      - seaborn 
+      - plotly 
+      - pandas-profiling 
+      - nodejs 
+      - pipreqs 

@@ -1,0 +1,40 @@
+#################### Global Build ARGs ####################
+ARG IMAGE_TAG="ubuntu:noble"
+
+################### Base Image  ###################
+FROM ${IMAGE_TAG}
+
+################### Variables ##################
+# Copy custom codes and templates, update ENV for ready access
+ARG  CUSTOM_DIR_SRC='../image_customizations'
+ARG  CUSTOM_DIR_DST="/shadowbox"
+
+COPY "${CUSTOM_DIR_SRC}/omp_themes" "${CUSTOM_DIR_DST}/omp_themes"
+COPY "${CUSTOM_DIR_SRC}/scripts" "${CUSTOM_DIR_DST}/scripts"
+ENV  PYTHONPATH="${CUSTOM_DIR_DST}/code/"
+
+# Within the container, where to install apps like Conda, etc.
+ARG  APP_INSTALL_DIR="/usr/bin"
+
+# Install essential CLI tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential ca-certificates \
+        wget curl \
+        nano vim less bat\
+        libglib2.0-0 software-properties-common \
+        procps tree htop tmux\
+        zip bzip2 unzip xz-utils \ 
+        iputils-ping net-tools \
+        openssh-server ssh-client \
+        fuse \
+        git \
+        sudo -y && \
+    apt-get clean
+
+# Install Bash customization themes
+RUN     ln -s batcat /usr/bin/bat &&\
+        curl -k -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/bin -t "${CUSTOM_DIR_DST}/omp_themes" &&\
+        echo "########## Customization for Oh-My-Posh Bash themes ##########" >> ~/.bashrc &&\
+        echo "eval \"\$(oh-my-posh init bash --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.bashrc &&\
+        echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.bashrc

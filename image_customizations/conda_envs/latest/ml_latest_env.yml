@@ -1,0 +1,39 @@
+name: ml
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip:
+      # Core ML libraries
+      - numpy 
+      - pandas
+      - scikit-learn 
+      - pycaret
+      - statsmodels 
+      - matplotlib
+      - mlflow
+      # CV libraries
+      - opencv-contrib-python-headless
+      - pillow
+      - scikit-image
+      - albumentations
+      - imagehash
+      # Webserver and app development
+      - flask
+      - fastapi
+      - uvicorn
+      - requests
+      - requests-oauthlib
+      - oauthlib
+      - flet[all]
+      - streamlit
+      # Other must-haves
+      - ipykernel
+      - tqdm
+      # Good to haves
+      - dask
+      - seaborn 
+      - plotly 
+      - pandas-profiling 
+      - nodejs 
+      - pipreqs 
