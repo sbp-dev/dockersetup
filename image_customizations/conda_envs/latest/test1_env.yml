@@ -1,0 +1,11 @@
+name: test1
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip:
+      # Core ML libraries
+      - numpy 
+      - pandas
+      # CV libraries
+      - pillow

@@ -3,7 +3,7 @@ This repo has Dockerfiles for setting up various Linux based development environ
 
 ## Dockerfile variants
 - **u24** - Ubuntu 24.04 LTS Base, with CLI utilities and Bash customization themes
-- **u24_Py** - Based on u22 image and Miniconda installed. Accepts command line arguments for installing Conda environments (e.g ML, Pytorch, Tensorflow, etc.)
+- **u24_Py** - Based on u24 image and Miniconda installed. Accepts command line arguments for installing Conda environments (e.g ML, Pytorch, Tensorflow, etc.)
 
 
 # How to use
@@ -39,3 +39,44 @@ Customizations can be done using command line arguments when building the Docker
 ```bash
 docker build -t u24_py_dl:$(date -u +"%Y%m%d") --build-arg INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest" -f Dockerfile_u24_Py .
 ```
+
+# Other details
+
+## Build Information Capture
+The `u24_Py` variant now automatically creates a `/.build_info` file containing comprehensive version information for deterministic builds. This file includes:
+- Build timestamp
+- Python version
+- Conda version
+- uv version
+- Oh-My-Posh version
+- Zsh version
+- Complete conda environment specifications for all installed environments
+
+This enables you to recreate identical builds in the future by referencing the exact versions used.
+
+## Version Derivation Guide
+
+### Miniconda Version
+To derive the correct `MINICONDA_FILE` value:
+1. Check the Python version you want: `python --version` (e.g., Python 3.11.0)
+2. Check the Conda version you want: `conda --version` (e.g., 23.10.0)
+3. Visit https://repo.anaconda.com/miniconda/ to find the matching installer
+4. Example: `Miniconda3-py311_23.10.0-1-Linux-x86_64.sh`
+
+### Pinned Conda Environments
+To create pinned conda environment files:
+1. Create your environment with specific versions: `conda create -n my_env python=3.11 numpy=1.24.0 pandas=2.0.0`
+2. Export with exact versions: `conda env export -n my_env --no-builds > my_env.yml`
+3. Place the file in `CUSTOM_DIR_SRC/conda_envs/pinned/` as `<env_name>_env.yml`
+4. Use in build: `--build-arg INSTALL_CONDA_ENVS_PINNED="my_env"`
+
+## Zsh Support
+Both `u24` and `u24_Py` variants now include Zsh with Oh-My-Posh theme support:
+- Zsh is installed and configured with the same theme as Bash
+- Switch to Zsh: `chsh -s $(which zsh)`
+- Both shells share the same Oh-My-Posh configuration and terminal logo script
+
+## uv Package Installer
+The `u24_Py` variant includes the uv package installer for faster Python package management:
+- Installed globally and available as `uv` command
+- Provides faster alternative to pip for Python package installation
