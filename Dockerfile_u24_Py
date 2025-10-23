@@ -3,6 +3,9 @@ ARG IMAGE_TAG="ubuntu:noble"
 
 ################### Base Image  ###################
 FROM ${IMAGE_TAG}
+ARG IMAGE_TAG
+ENV IMAGE_TAG=${IMAGE_TAG}
+ARG BUILD_INFO_DIR="/.build_info"
 
 ################### Variables ##################
 # Copy custom codes and templates, update ENV for ready access
@@ -11,7 +14,6 @@ ARG  CUSTOM_DIR_DST="/shadowbox"
 
 COPY "${CUSTOM_DIR_SRC}/omp_themes" "${CUSTOM_DIR_DST}/omp_themes"
 COPY "${CUSTOM_DIR_SRC}/scripts" "${CUSTOM_DIR_DST}/scripts"
-ENV  PYTHONPATH="${CUSTOM_DIR_DST}/code/"
 
 # Within the container, where to install apps like Conda, etc.
 ARG  APP_INSTALL_DIR="/usr/bin"
@@ -47,6 +49,7 @@ RUN     ln -s batcat /usr/bin/bat &&\
 # # Get Miniconda version as ARG, default to latest
 ARG  MINICONDA_FILE="Miniconda3-latest-Linux-x86_64.sh"
 ARG  INSTALL_CONDA_ENVS_LATEST=""
+ENV  PYTHONPATH="${CUSTOM_DIR_DST}/code/"
 
 RUN     wget --no-check-certificate https://repo.anaconda.com/miniconda/$MINICONDA_FILE  &&\
         chmod 755 $MINICONDA_FILE &&\
@@ -118,37 +121,47 @@ RUN if [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
     fi
 
 ## Create build info file for deterministic builds
-RUN mkdir -p /.build_info && \
-    echo "========== Build Information ==========" > /.build_info/build_info.txt && \
-    echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> /.build_info/build_info.txt && \
-    echo "" >> /.build_info/build_info.txt && \
-    echo "========== Tool Versions ==========" >> /.build_info/build_info.txt && \
-    echo "Conda Version:" >> /.build_info/build_info.txt && \
-    conda --version >> /.build_info/build_info.txt 2>&1 && \
-    echo "" >> /.build_info/build_info.txt && \
-    # echo "uv Version:" >> /.build_info/build_info.txt && \
-    # uv --version >> /.build_info/build_info.txt 2>&1 && \
-    # echo "" >> /.build_info/build_info.txt && \
-    echo "Oh-My-Posh Version:" >> /.build_info/build_info.txt && \
-    oh-my-posh --version >> /.build_info/build_info.txt 2>&1 && \
-    echo "" >> /.build_info/build_info.txt && \
-    echo "Zsh Version:" >> /.build_info/build_info.txt && \
-    zsh --version >> /.build_info/build_info.txt 2>&1 && \
-    echo "" >> /.build_info/build_info.txt && \
-    echo "========== Installed Conda Environments ==========" >> /.build_info/build_info.txt && \
+RUN mkdir -p ${BUILD_INFO_DIR} && \
+    echo "========== Build Information ==========" > ${BUILD_INFO_DIR}/summary.txt && \
+    echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "========== ARG Variables ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "IMAGE_TAG: ${IMAGE_TAG}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "CUSTOM_DIR_SRC: ${CUSTOM_DIR_SRC}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "CUSTOM_DIR_DST: ${CUSTOM_DIR_DST}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "APP_INSTALL_DIR: ${APP_INSTALL_DIR}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "MINICONDA_FILE: ${MINICONDA_FILE}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "INSTALL_CONDA_ENVS_LATEST: ${INSTALL_CONDA_ENVS_LATEST}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "INSTALL_CONDA_ENVS_PINNED: ${INSTALL_CONDA_ENVS_PINNED}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "========== ENV Variables ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "PYTHONPATH: ${PYTHONPATH}" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "========== Tool Versions ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "Conda Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
+    conda --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "Python Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
+    conda run python --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    # echo "uv Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
+    # /usr/bin/uv --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
+    # echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "Oh-My-Posh Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
+    oh-my-posh --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "Zsh Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
+    zsh --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
+    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
+    echo "========== Installed Conda Environments ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
     if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ] || [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
-        echo "Latest Environments: ${INSTALL_CONDA_ENVS_LATEST}" >> /.build_info/build_info.txt && \
-        echo "Pinned Environments: ${INSTALL_CONDA_ENVS_PINNED}" >> /.build_info/build_info.txt && \
-        echo "" >> /.build_info/build_info.txt && \
-        echo "Environment Details:" >> /.build_info/build_info.txt && \
-        for env in $(conda env list | grep -v '^#' | awk '{print $1}' | grep -v 'base'); do \
-            echo "----- $env -----" >> /.build_info/build_info.txt && \
-            conda env export -n "$env" >> /.build_info/build_info.txt 2>&1 && \
-            echo "" >> /.build_info/build_info.txt; \
-        done; \
+        echo "Latest Environments: ${INSTALL_CONDA_ENVS_LATEST}" >> ${BUILD_INFO_DIR}/summary.txt && \
+        echo "Pinned Environments: ${INSTALL_CONDA_ENVS_PINNED}" >> ${BUILD_INFO_DIR}/summary.txt && \
+        echo "" >> ${BUILD_INFO_DIR}/summary.txt; \
     else \
-        echo "No custom environments installed" >> /.build_info/build_info.txt; \
-    fi
+        echo "No custom environments installed" >> ${BUILD_INFO_DIR}/summary.txt; \
+    fi && \
+    cp ${CUSTOM_DIR_DST}/conda_envs/installed/*.yml ${BUILD_INFO_DIR}/ 2>/dev/null || true
 
 # ENV     CONDA_PREFIX="$HOME/miniconda3" PATH=$CONDA_PREFIX/bin/:$PATH
 
