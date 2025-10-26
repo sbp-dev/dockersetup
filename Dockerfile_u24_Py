@@ -5,76 +5,83 @@ ARG IMAGE_TAG="ubuntu:noble"
 FROM ${IMAGE_TAG}
 ARG IMAGE_TAG
 ENV IMAGE_TAG=${IMAGE_TAG}
+
+################## Other ARGs ################
+ARG CUSTOM_DIR_SRC='../image_customizations'
+ARG CUSTOM_DIR_DST="/shadowbox"
+ARG APP_INSTALL_DIR="/usr/bin"
 ARG BUILD_INFO_DIR="/.build_info"
 
-################### Variables ##################
-# Copy custom codes and templates, update ENV for ready access
-ARG  CUSTOM_DIR_SRC='../image_customizations'
-ARG  CUSTOM_DIR_DST="/shadowbox"
-
-COPY "${CUSTOM_DIR_SRC}/omp_themes" "${CUSTOM_DIR_DST}/omp_themes"
-COPY "${CUSTOM_DIR_SRC}/scripts" "${CUSTOM_DIR_DST}/scripts"
-
-# Within the container, where to install apps like Conda, etc.
-ARG  APP_INSTALL_DIR="/usr/bin"
-
-# Install essential CLI tools
+################### Install essential CLI tools ###################
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential ca-certificates \
         wget curl \
-        nano micro vim less bat\
+        nano micro vim less bat \
         libglib2.0-0 software-properties-common \
-        procps tree htop tmux\
+        procps tree htop tmux \
         zip bzip2 unzip xz-utils \
         iputils-ping net-tools \
         openssh-server ssh-client \
         fuse \
         git \
         sudo \
-        zsh -y && \
-    apt-get clean
+        zsh && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Bash and Zsh customization themes
-RUN     ln -s batcat /usr/bin/bat &&\
-        curl -k -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/bin -t "${CUSTOM_DIR_DST}/omp_themes" &&\
-        echo "########## Customization for Oh-My-Posh Bash themes ##########" >> ~/.bashrc &&\
-        echo "eval \"\$(oh-my-posh init bash --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.bashrc &&\
-        echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.bashrc &&\
-        echo "########## Customization for Oh-My-Posh Zsh themes ##########" >> ~/.zshrc &&\
-        echo "eval \"\$(oh-my-posh init zsh --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.zshrc &&\
-        echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.zshrc
+################### Copy custom codes and templates ###################
+COPY "${CUSTOM_DIR_SRC}/omp_themes" "${CUSTOM_DIR_DST}/omp_themes"
+COPY "${CUSTOM_DIR_SRC}/scripts" "${CUSTOM_DIR_DST}/scripts"
 
-# # Anaconda installation and initialization
-# # Get Miniconda version as ARG, default to latest
-ARG  MINICONDA_FILE="Miniconda3-latest-Linux-x86_64.sh"
-ARG  INSTALL_CONDA_ENVS_LATEST=""
-ENV  PYTHONPATH="${CUSTOM_DIR_DST}/code/"
+################### Install Bash and Zsh customization themes ###################
+RUN ln -s batcat /usr/bin/bat && \
+    curl -fsSL https://ohmyposh.dev/install.sh -o /tmp/install_omp.sh && \
+    bash /tmp/install_omp.sh -d /usr/bin -t "${CUSTOM_DIR_DST}/omp_themes" && \
+    rm /tmp/install_omp.sh && \
+    echo "########## Customization for Oh-My-Posh Bash themes ##########" >> ~/.bashrc && \
+    echo "eval \"\$(oh-my-posh init bash --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.bashrc && \
+    echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.bashrc && \
+    echo "########## Customization for Oh-My-Posh Zsh themes ##########" >> ~/.zshrc && \
+    echo "eval \"\$(oh-my-posh init zsh --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.zshrc && \
+    echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.zshrc
 
-RUN     wget --no-check-certificate https://repo.anaconda.com/miniconda/$MINICONDA_FILE  &&\
-        chmod 755 $MINICONDA_FILE &&\
-        ./$MINICONDA_FILE -p $APP_INSTALL_DIR/miniconda3 -b &&\
-        rm $MINICONDA_FILE &&\
-        ln -s $APP_INSTALL_DIR/miniconda3/bin/conda /$APP_INSTALL_DIR/conda &&\
-        ln -s $APP_INSTALL_DIR/miniconda3/bin/pip /$APP_INSTALL_DIR/pip &&\
-        conda init bash &&\
-        conda clean --all -y &&\
-        conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main &&\
-        conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 
-        # mkdir -p $HOME/miniconda3/etc/conda/activate.d &&\
-        # echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniconda3/lib/' > $HOME/miniconda3/etc/conda/activate.d/env_vars.sh
+################### Python installation related ARGs #####################
+ARG MINICONDA_FILE="Miniconda3-latest-Linux-x86_64.sh"
+ARG PYTHONPATH="${CUSTOM_DIR_DST}/code/"
+ENV PYTHONPATH=${PYTHONPATH}
 
-# Install uv package installer
+################### Miniconda installation and initialization ###################
+RUN wget https://repo.anaconda.com/miniconda/$MINICONDA_FILE && \
+    chmod 755 $MINICONDA_FILE && \
+    ./$MINICONDA_FILE -p $APP_INSTALL_DIR/miniconda3 -b && \
+    rm $MINICONDA_FILE && \
+    ln -s $APP_INSTALL_DIR/miniconda3/bin/conda /$APP_INSTALL_DIR/conda && \
+    ln -s $APP_INSTALL_DIR/miniconda3/bin/pip /$APP_INSTALL_DIR/pip && \
+    conda init bash && \
+    conda clean --all -y && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+# NOTE: If build fails due to certificate issues (common behind corporate firewalls),
+# add --no-check-certificate flag to wget command above:
+# RUN wget --no-check-certificate https://repo.anaconda.com/miniconda/$MINICONDA_FILE && \
+
+################### Install uv package installer ###################
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-   ln -s $HOME/.cargo/bin/uv /usr/bin/uv
+    ln -s /root/.local/bin/uv $APP_INSTALL_DIR/uv
+    # rm -rf /root/.rustup || true
 
-## Create a directory to hold the environment files of the installed conda environment
+################### Create directory for conda environment files ###################
 COPY "${CUSTOM_DIR_SRC}/conda_envs" "${CUSTOM_DIR_DST}/conda_envs"
 RUN mkdir -p "${CUSTOM_DIR_DST}/conda_envs/installed"
 
-## Install the latest version of each conda environment from input
-RUN if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ]; then \
+################### Install latest version of each conda environment ###################
+ARG INSTALL_CONDA_ENVS_LATEST=""
+
+RUN set -e && \
+    if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ]; then \
         echo "Installing Conda environments: ${INSTALL_CONDA_ENVS_LATEST}"; \
         for env_name in ${INSTALL_CONDA_ENVS_LATEST}; do \
             ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/latest/${env_name}_env.yml"; \
@@ -83,95 +90,82 @@ RUN if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ]; then \
                 echo "Creating environment '$env_name' from '$ENV_FILE'"; \
                 conda env create -f "$ENV_FILE" --yes; \
                 echo "Exporting environment '$env_name' to ${CUSTOM_DIR_DST}/conda_envs/installed/ directory"; \
-                # Export the environment specification
                 conda env export -n "$env_name" > "$ENV_FILE_TO_EXPORT"; \
-                # bat "$ENV_FILE_TO_EXPORT"; \
             else \
                 echo "Warning: Environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
-                #exit 1; \
             fi; \
         done; \
         echo "Cleaning Conda cache after all environments are installed."; \
         conda clean --all -y; \
         pip cache purge; \
     else \
-        echo "No specific Conda environments requested via INSTALL_CONDA_ENVS. Skipping environment creation."; \
+        echo "No specific Conda environments requested via INSTALL_CONDA_ENVS_LATEST. Skipping environment creation."; \
     fi
 
-## Install the pinned version of each conda environment from input
-ARG  INSTALL_CONDA_ENVS_PINNED=""
+################### Install pinned version of each conda environment ###################
+ARG INSTALL_CONDA_ENVS_PINNED=""
 
-RUN if [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
+RUN set -e && \
+    if [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
         echo "Installing Conda environments: ${INSTALL_CONDA_ENVS_PINNED}"; \
         for env_name in ${INSTALL_CONDA_ENVS_PINNED}; do \
             ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/pinned/${env_name}_env.yml"; \
             if [ -f "$ENV_FILE" ]; then \
                 echo "Creating environment '$env_name' from '$ENV_FILE'"; \
                 conda env create -f "$ENV_FILE" --yes; \
+                cp ${ENV_FILE} ${CUSTOM_DIR_DST}/conda_envs/installed/; \
             else \
                 echo "Warning: Environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
-                #exit 1; \
             fi; \
         done; \
         echo "Cleaning Conda cache after all environments are installed."; \
         conda clean --all -y; \
         pip cache purge; \
     else \
-        echo "No specific Conda environments requested via INSTALL_CONDA_ENVS. Skipping environment creation."; \
+        echo "No specific Conda environments requested via INSTALL_CONDA_ENVS_PINNED. Skipping environment creation."; \
     fi
 
-## Create build info file for deterministic builds
+################### Create build info file for deterministic builds ###################
 RUN mkdir -p ${BUILD_INFO_DIR} && \
-    echo "========== Build Information ==========" > ${BUILD_INFO_DIR}/summary.txt && \
-    echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "========== ARG Variables ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "IMAGE_TAG: ${IMAGE_TAG}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "CUSTOM_DIR_SRC: ${CUSTOM_DIR_SRC}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "CUSTOM_DIR_DST: ${CUSTOM_DIR_DST}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "APP_INSTALL_DIR: ${APP_INSTALL_DIR}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "MINICONDA_FILE: ${MINICONDA_FILE}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "INSTALL_CONDA_ENVS_LATEST: ${INSTALL_CONDA_ENVS_LATEST}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "INSTALL_CONDA_ENVS_PINNED: ${INSTALL_CONDA_ENVS_PINNED}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "========== ENV Variables ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "PYTHONPATH: ${PYTHONPATH}" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "========== Tool Versions ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "Conda Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
-    conda --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "Python Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
-    conda run python --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    # echo "uv Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
-    # /usr/bin/uv --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
-    # echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "Oh-My-Posh Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
-    oh-my-posh --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "Zsh Version:" >> ${BUILD_INFO_DIR}/summary.txt && \
-    zsh --version >> ${BUILD_INFO_DIR}/summary.txt 2>&1 && \
-    echo "" >> ${BUILD_INFO_DIR}/summary.txt && \
-    echo "========== Installed Conda Environments ==========" >> ${BUILD_INFO_DIR}/summary.txt && \
-    if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ] || [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
-        echo "Latest Environments: ${INSTALL_CONDA_ENVS_LATEST}" >> ${BUILD_INFO_DIR}/summary.txt && \
-        echo "Pinned Environments: ${INSTALL_CONDA_ENVS_PINNED}" >> ${BUILD_INFO_DIR}/summary.txt && \
-        echo "" >> ${BUILD_INFO_DIR}/summary.txt; \
-    else \
-        echo "No custom environments installed" >> ${BUILD_INFO_DIR}/summary.txt; \
-    fi && \
+    { \
+        echo "========== Build Information =========="; \
+        echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; \
+        echo ""; \
+        echo "========== ARG Variables =========="; \
+        echo "IMAGE_TAG: ${IMAGE_TAG}"; \
+        echo "CUSTOM_DIR_SRC: ${CUSTOM_DIR_SRC}"; \
+        echo "CUSTOM_DIR_DST: ${CUSTOM_DIR_DST}"; \
+        echo "APP_INSTALL_DIR: ${APP_INSTALL_DIR}"; \
+        echo "MINICONDA_FILE: ${MINICONDA_FILE}"; \
+        echo "INSTALL_CONDA_ENVS_LATEST: ${INSTALL_CONDA_ENVS_LATEST}"; \
+        echo "INSTALL_CONDA_ENVS_PINNED: ${INSTALL_CONDA_ENVS_PINNED}"; \
+        echo ""; \
+        echo "========== ENV Variables =========="; \
+        echo "PYTHONPATH: ${PYTHONPATH}"; \
+        echo ""; \
+        echo "========== Tool Versions =========="; \
+        echo "Conda Version:"; \
+        conda --version 2>&1; \
+        echo ""; \
+        echo "Python Version:"; \
+        conda run python --version 2>&1; \
+        echo ""; \
+        echo "uv Version:"; \
+        $APP_INSTALL_DIR/uv --version 2>&1; \
+        echo ""; \
+        echo "Oh-My-Posh Version:"; \
+        oh-my-posh --version 2>&1; \
+        echo ""; \
+        echo "Zsh Version:"; \
+        zsh --version 2>&1; \
+        echo ""; \
+        echo "========== Installed Conda Environments =========="; \
+        if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ] || [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
+            echo "Latest Environments: ${INSTALL_CONDA_ENVS_LATEST}"; \
+            echo "Pinned Environments: ${INSTALL_CONDA_ENVS_PINNED}"; \
+            echo ""; \
+        else \
+            echo "No custom environments installed"; \
+        fi; \
+    } > ${BUILD_INFO_DIR}/summary.txt && \
     cp ${CUSTOM_DIR_DST}/conda_envs/installed/*.yml ${BUILD_INFO_DIR}/ 2>/dev/null || true
-
-# ENV     CONDA_PREFIX="$HOME/miniconda3" PATH=$CONDA_PREFIX/bin/:$PATH
-
-# # UPDATE 27th December 2023: Below lines break apt-get! Commenting but retaining if required for future
-# # # Some customization required for TensorFlow conda installation
-# # # For some reason, CONDA_PREFIX does not expand! So using HOME as expansion
-# RUN     mkdir -p $HOME/miniconda3/etc/conda/activate.d &&\
-#         echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniconda3/lib/' > $HOME/miniconda3/etc/conda/activate.d/env_vars.sh
-
-
-# # Install Azure CLI
-# RUN     curl -sL https://aka.ms/InstallAzureCLIDeb | bash &&\
-#         az extension add -n ml -y

@@ -79,4 +79,47 @@ Both `u24` and `u24_Py` variants now include Zsh with Oh-My-Posh theme support:
 ## uv Package Installer
 The `u24_Py` variant includes the uv package installer for faster Python package management:
 - Installed globally and available as `uv` command
+
+## Implementation Notes & Removed Code Patterns
+
+The following sections document code patterns and configurations that were removed or commented out during optimization efforts. This information is retained for reference in case these approaches need to be revisited.
+
+### Conda Environment Activation Variables
+**Removed from:** `Dockerfile_u24_Py` (lines 65-66, 171-172)
+
+Original approach attempted to set `LD_LIBRARY_PATH` for TensorFlow compatibility:
+```bash
+mkdir -p $HOME/miniconda3/etc/conda/activate.d
+echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniconda3/lib/' > $HOME/miniconda3/etc/conda/activate.d/env_vars.sh
+```
+
+**Reason for removal:** This configuration broke `apt-get` functionality in subsequent build steps. Modern TensorFlow and conda installations handle library paths automatically through conda's activation scripts.
+
+**When to re-enable:** If you encounter TensorFlow library loading errors (e.g., `libcuda.so.1` not found), uncomment these lines and test in isolation before the main package installation steps.
+
+### Azure CLI Installation
+**Removed from:** `Dockerfile_u24_Py` (lines 175-177)
+
+Original code:
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+az extension add -n ml -y
+```
+
+**Reason for removal:** Azure CLI adds significant image size (~500MB) and is not universally needed. Users requiring Azure CLI can install it in their own derived images or as a separate optional layer.
+
+**When to re-enable:** If your development workflow requires Azure CLI, create a separate `Dockerfile_u24_Py_azure` variant that extends the base `u24_Py` image.
+
+### CONDA_PREFIX Environment Variable
+**Removed from:** `Dockerfile_u24_Py` (line 166)
+
+Original code:
+```bash
+ENV CONDA_PREFIX="$HOME/miniconda3" PATH=$CONDA_PREFIX/bin/:$PATH
+```
+
+**Reason for removal:** Conda's initialization scripts (`conda init bash`) automatically set `CONDA_PREFIX` and update `PATH`. Explicit setting can cause conflicts with conda's environment activation mechanism.
+
+**When to re-enable:** Only if you need to override conda's default behavior for specific use cases (e.g., using a non-standard conda installation path).
+
 - Provides faster alternative to pip for Python package installation

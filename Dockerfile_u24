@@ -3,42 +3,69 @@ ARG IMAGE_TAG="ubuntu:noble"
 
 ################### Base Image  ###################
 FROM ${IMAGE_TAG}
+ARG IMAGE_TAG
+ENV IMAGE_TAG=${IMAGE_TAG}
 
-################### Variables ##################
-# Copy custom codes and templates, update ENV for ready access
-ARG  CUSTOM_DIR_SRC='../image_customizations'
-ARG  CUSTOM_DIR_DST="/shadowbox"
+################## Other ARGs ################
+ARG CUSTOM_DIR_SRC='../image_customizations'
+ARG CUSTOM_DIR_DST="/shadowbox"
+ARG APP_INSTALL_DIR="/usr/bin"
+ARG BUILD_INFO_DIR="/.build_info"
 
-COPY "${CUSTOM_DIR_SRC}/omp_themes" "${CUSTOM_DIR_DST}/omp_themes"
-COPY "${CUSTOM_DIR_SRC}/scripts" "${CUSTOM_DIR_DST}/scripts"
-ENV  PYTHONPATH="${CUSTOM_DIR_DST}/code/"
-
-# Within the container, where to install apps like Conda, etc.
-ARG  APP_INSTALL_DIR="/usr/bin"
-
-# Install essential CLI tools
+################### Install essential CLI tools ###################
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential ca-certificates \
         wget curl \
-        nano micro vim less bat\
+        nano micro vim less bat \
         libglib2.0-0 software-properties-common \
-        procps tree htop tmux\
+        procps tree htop tmux \
         zip bzip2 unzip xz-utils \
         iputils-ping net-tools \
         openssh-server ssh-client \
         fuse \
         git \
         sudo \
-        zsh -y && \
-    apt-get clean
+        zsh && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Bash and Zsh customization themes
-RUN     ln -s batcat /usr/bin/bat &&\
-        curl -k -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/bin -t "${CUSTOM_DIR_DST}/omp_themes" &&\
-        echo "########## Customization for Oh-My-Posh Bash themes ##########" >> ~/.bashrc &&\
-        echo "eval \"\$(oh-my-posh init bash --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.bashrc &&\
-        echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.bashrc &&\
-        echo "########## Customization for Oh-My-Posh Zsh themes ##########" >> ~/.zshrc &&\
-        echo "eval \"\$(oh-my-posh init zsh --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.zshrc &&\
-        echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.zshrc
+################### Copy custom codes and templates ###################
+COPY "${CUSTOM_DIR_SRC}/omp_themes" "${CUSTOM_DIR_DST}/omp_themes"
+COPY "${CUSTOM_DIR_SRC}/scripts" "${CUSTOM_DIR_DST}/scripts"
+
+################### Install Bash and Zsh customization themes ###################
+RUN ln -s batcat /usr/bin/bat && \
+    curl -fsSL https://ohmyposh.dev/install.sh -o /tmp/install_omp.sh && \
+    bash /tmp/install_omp.sh -d /usr/bin -t "${CUSTOM_DIR_DST}/omp_themes" && \
+    rm /tmp/install_omp.sh && \
+    echo "########## Customization for Oh-My-Posh Bash themes ##########" >> ~/.bashrc && \
+    echo "eval \"\$(oh-my-posh init bash --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.bashrc && \
+    echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.bashrc && \
+    echo "########## Customization for Oh-My-Posh Zsh themes ##########" >> ~/.zshrc && \
+    echo "eval \"\$(oh-my-posh init zsh --config ${CUSTOM_DIR_DST}/omp_themes/sbp_clean_detailed.omp.json)\"" >> ~/.zshrc && \
+    echo "eval \"${CUSTOM_DIR_DST}/scripts/terminal_logo.sh\"" >> ~/.zshrc
+
+################### Create build info file for deterministic builds ###################
+RUN mkdir -p ${BUILD_INFO_DIR} && \
+    { \
+        echo "========== Build Information =========="; \
+        echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; \
+        echo ""; \
+        echo "========== ARG Variables =========="; \
+        echo "IMAGE_TAG: ${IMAGE_TAG}"; \
+        echo "CUSTOM_DIR_SRC: ${CUSTOM_DIR_SRC}"; \
+        echo "CUSTOM_DIR_DST: ${CUSTOM_DIR_DST}"; \
+        echo "APP_INSTALL_DIR: ${APP_INSTALL_DIR}"; \
+        echo ""; \
+        echo "========== ENV Variables =========="; \
+        echo "PYTHONPATH: ${PYTHONPATH}"; \
+        echo ""; \
+        echo "========== Tool Versions =========="; \
+        echo "Oh-My-Posh Version:"; \
+        oh-my-posh --version 2>&1; \
+        echo ""; \
+        echo "Zsh Version:"; \
+        zsh --version 2>&1; \
+        echo ""; \
+    } > ${BUILD_INFO_DIR}/summary.txt
