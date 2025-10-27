@@ -90,15 +90,16 @@ RUN set -e && \
         # Install latest environments \
         if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ]; then \
             for env_name in ${INSTALL_CONDA_ENVS_LATEST}; do \
-                ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/latest/${env_name}_env.yml"; \
-                ENV_FILE_TO_EXPORT="${CUSTOM_DIR_DST}/conda_envs/installed/${env_name}_env_$(date -u +"%Y%m%d").yml"; \
-                if [ -f "$ENV_FILE" ]; then \
-                    echo "Creating latest environment '$env_name' from '$ENV_FILE'"; \
-                    conda env create -f "$ENV_FILE" --yes; \
+                ENV_FILE_PATH_SRC="${CUSTOM_DIR_DST}/conda_envs/latest/${env_name}_env.yml"; \
+                if [ -f "$ENV_FILE_PATH_SRC" ]; then \
+                    echo "Creating latest environment '$env_name' from '$ENV_FILE_PATH_SRC'"; \
+                    conda env create -f "$ENV_FILE_PATH_SRC" --yes; \
                     echo "Exporting environment '$env_name' to ${CUSTOM_DIR_DST}/conda_envs/installed/ directory"; \
-                    conda env export -n "$env_name" > "$ENV_FILE_TO_EXPORT"; \
+                    ENV_NAME_INSTALLED=$(grep '^[[:space:]]*name:' "$ENV_FILE_PATH_SRC" | awk -F: '{print $2}' | tr -d '\r\n' | xargs); \
+                    ENV_FILE_PATH_DST="${CUSTOM_DIR_DST}/conda_envs/installed/${ENV_NAME_INSTALLED}_$(date -u +"%Y%m%d")_env.yml"; \
+                    conda env export -n "$ENV_NAME_INSTALLED" | grep -v "^prefix: " > "$ENV_FILE_PATH_DST"; \
                 else \
-                    echo "Warning: Latest environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
+                    echo "Warning: Latest environment file '$ENV_FILE_PATH_SRC' not found for '$env_name'. Skipping."; \
                 fi; \
             done; \
         fi; \
@@ -106,16 +107,16 @@ RUN set -e && \
         # Install pinned environments \
         if [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
             for env_name in ${INSTALL_CONDA_ENVS_PINNED}; do \
-                ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/pinned/${env_name}_env.yml"; \
-                ENV_FILE_TO_EXPORT="${CUSTOM_DIR_DST}/conda_envs/installed/${env_name}_env_$(date -u +"%Y%m%d").yml"; \
-                if [ -f "$ENV_FILE" ]; then \
-                    echo "Creating pinned environment '$env_name' from '$ENV_FILE'"; \
-                    conda env create -f "$ENV_FILE" --yes; \
+                ENV_FILE_PATH_SRC="${CUSTOM_DIR_DST}/conda_envs/pinned/${env_name}_env.yml"; \
+                if [ -f "$ENV_FILE_PATH_SRC" ]; then \
+                    echo "Creating pinned environment '$env_name' from '$ENV_FILE_PATH_SRC'"; \
+                    conda env create -f "$ENV_FILE_PATH_SRC" --yes; \
                     echo "Exporting environment '$env_name' to ${CUSTOM_DIR_DST}/conda_envs/installed/ directory"; \
-                    conda env export -n "$env_name" > "$ENV_FILE_TO_EXPORT"; \
-                    # cp ${ENV_FILE} ${CUSTOM_DIR_DST}/conda_envs/installed/; \
+                    ENV_NAME_INSTALLED=$(grep '^[[:space:]]*name:' "$ENV_FILE_PATH_SRC" | awk -F: '{print $2}' | tr -d '\r\n' | xargs); \
+                    ENV_FILE_PATH_DST="${CUSTOM_DIR_DST}/conda_envs/installed/${ENV_NAME_INSTALLED}_$(date -u +"%Y%m%d")_env.yml"; \
+                    conda env export -n "$ENV_NAME_INSTALLED" | grep -v "^prefix: " > "$ENV_FILE_PATH_DST"; \
                 else \
-                    echo "Warning: Pinned environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
+                    echo "Warning: Pinned environment file '$ENV_FILE_PATH_SRC' not found for '$env_name'. Skipping."; \
                 fi; \
             done; \
         fi; \
