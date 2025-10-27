@@ -14,7 +14,8 @@ Customizations can be done using command line arguments when building the Docker
 - `IMAGE_TAG` - Base image tag (default: `ubuntu:noble`)
 - `CUSTOM_DIR_SRC` - Source directory (on Host OS) for customizations (default: `../image_customizations`)
 - `CUSTOM_DIR_DST` - Destination directory (within container) where to copy over stuff from `CUSTOM_DIR_SRC` (default: `/shadowbox`)
-- `APP_INSTALL_DIR` - Directory where to install apps like Conda, etc.
+- `APP_INSTALL_DIR` - Directory (within container) where to install apps like Conda, etc.
+- `BUILD_INFO_DIR` - Directory (within container) where to log build related information, such as summary, Conda environment YML files etc.
 
 ### Only `u24_Py` variant
 - `MINICONDA_FILE` - Which miniconda version to install (default: `Miniconda3-latest-Linux-x86_64.sh`)
@@ -23,9 +24,9 @@ Customizations can be done using command line arguments when building the Docker
     - This is convenient when we'd like to install latest versions of our favourite packages. 
     - Example: `INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest"` 
     - This **must** be a string seperated by spaces. 
-    - Each such string must have a corresponding  Conda environment YAML file of the format `<ENV_NAME>_env.yml` located in `CUSTOM_DIR_SRC/conda_envs/latest` directory. 
+    - Each such string must have a corresponding Conda environment YAML file of the format `<ENV_NAME>_env.yml` located in `CUSTOM_DIR_SRC/conda_envs/latest` directory
     - Example: `/shadowbox/conda_envs/latest/pt_latest_env.yml`, `/shadowbox/conda_envs/latest/tf_latest_env.yml`
-    - NOTE: Ensure that the YAML files don't have pinned versions, otherwise the purpose is defeated!
+    - **NOTE:** Ensure that the YAML files don't have pinned versions, otherwise the purpose is defeated!
 
 - `INSTALL_CONDA_ENVS_PINNED` - Use this option to recreated Conda environments from YAML files that include specific version.
     - This is convenient if we want to replicate a project environment exactly for working in a group, CI / CD, etc.
@@ -33,26 +34,110 @@ Customizations can be done using command line arguments when building the Docker
     - This **must** be a string seperated by spaces. 
     - Each such string must have a corresponding  Conda environment YAML file of the format `<ENV_NAME>_env.yml` located in `CUSTOM_DIR_SRC/conda_envs/latest` directory. 
     - Example: `/shadowbox/conda_envs/latest/pt_20250620_env.yml`, `/shadowbox/conda_envs/latest/tf_20250620_env.yml`
-    - NOTE: Ensure that the YAML files have pinned versions, otherwise the purpose is defeated!
+    - **NOTE:** Ensure that the YAML files have pinned versions, otherwise the purpose is defeated!
 
-
+## Usage
+The following examples must be run from the same directory where the Dockerfiles are located.
+### Example 1: Simple, custom Ubuntu image
 ```bash
-docker build -t u24_py_dl:$(date -u +"%Y%m%d") --build-arg INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest" -f Dockerfile_u24_Py .
+# bash
+docker build \
+  -t u24:$(date -u +"%Y%m%d") \
+  -f .\Dockerfile_u24 .
 ```
+```cmd
+REM Windows CMD
+docker build ^
+  -t u24:$(date -u +"%Y%m%d") ^
+  -f .\Dockerfile_u24 .
+```
+The above command will create an image with the following:
+- Name `u24_py:<UTC_DATE>`
+- Miniconda and UV are not pre-installed
+
+### Example 2: Simple Python (Miniconda + UV) image
+```bash
+# bash
+docker build \
+  -t u24_py:$(date -u +"%Y%m%d") \
+  -f .\Dockerfile_u24_Py .
+```
+```cmd
+REM Windows CMD
+docker build ^
+  -t u24_py:$(date -u +"%Y%m%d") ^
+  -f .\Dockerfile_u24_Py .
+```
+The above command will create an image with the following:
+- Name `u24_py:<UTC_DATE>`
+- No conda environments are installed 
+
+### Example 3: Auto-install Necessary Conda envs
+```bash
+# bash
+docker build \
+  -t u24_py_dl:$(date -u +"%Y%m%d") \
+  --build-arg INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest" \
+  --build-arg INSTALL_CONDA_ENVS_PINNED="ml_20251027" \
+  -f .\Dockerfile_u24_Py .
+```
+```cmd
+REM Windows CMD
+docker build ^
+  -t u24_py_dl:$(date -u +"%Y%m%d") ^
+  --build-arg INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest" ^
+  --build-arg INSTALL_CONDA_ENVS_PINNED="ml_20251027" ^
+  -f .\Dockerfile_u24_Py .
+```
+The above command will create an image with the following:
+- Name `u24_py_dl:<UTC_DATE>`
+- Automatically install two conda environments from the files `pt_latest_env.yml` and `tf_latest_env.yml` in `$CUSTOM_DIR_DST/conda_envs/latest/` directory
+- Automatically install another conda environment from the file `ml_20251027_env.yml` in `$CUSTOM_DIR_DST/conda_envs/pinned/` directory <br>
+
+**NOTE:** In the container, the actual name of the installed Conda environments may not be the same as `pt_latest` etc. since it will be picked up from the `name` field in the YML files
 
 # Other details
+## Understanding auto-installation of Conda envs (`u24_py` only)
+As described above, Conda environments can be auto-installed during building the images using the `INSTALL_CONDA_ENVS_LATEST` or `INSTALL_CONDA_ENVS_PINNED` ARGs. There are tree types of names involved internally, viz.
+- `ENV_FILE_PATH_SRC`
+    - Path of the YML file to install the conda environment from
+    - Must end with the suffix `"_env.yml"`
+    - Prefixed with `$CUSTOM_DIR_DST/conda_envs/latest/` or `$CUSTOM_DIR_DST/conda_envs/pinned/` directory paths, depending on which build ARG was used
+- `ENV_NAME_INSTALLED`  
+    - The actual name of the conda environment that is created
+    - Taken from the `name` field within the `ENV_FILE_PATH_SRC` file
+- `ENV_FILE_PATH_DST`
+    - After successful creation of the Conda environment, this is the path where the installed specs of the environment is to be exported
+    - The path is prefixed with `$CUSTOM_DIR_DST/conda_envs/installed/`
+    - The name of the file automatically is prefixed with `ENV_NAME_INSTALLED` and suffixed with `"_env.yml"`
+    - Specifically, the format is `"<ENV_NAME_INSTALLED>_<DATE_STAMP>_env.yml"`
+
+Given that the names of the installed conda environments is as per the `name` field within the respective YML file (which could be anything!) here are a few suggestions for naming:
+- Decide the desired name (preferrably short) that you want to use with `conda activate`, once the container is ready, e.g. `pt` for PyTorch
+- Set this as the `name` filed of the corresponding YML file
+    - This gets treated as `ENV_NAME_INSTALLED`
+- Keep this name (`pt`) as the prefix for the name of this YML file itself, e.g. `pt_latest_env.yml` / `pt_20251027_env.yml` / `pt_env.yml`, etc.
+    - **IMPORTANT:** Make sure to have the `_env.yml` suffix, in the file name, otherwise it will be ignored!
+    - The path of this file is treated as `ENV_FILE_PATH_SRC`
+- When using the Dockerfile to build a new image, pass the names _**without the `_env.yml` suffix**_
+    - E.g. `INSTALL_CONDA_ENVS_LATEST="pt_latest"` etc.
+    - This will look for a file named `pt_latest_env.yml` in the `$CUSTOM_DIR_DST/conda_envs/latest/` directory
+    - Since the file itself has a `name` filed as `pt`, the installed conda environment will have the same name as `pt`
+    - After installation, the environment details will be exported to a file located in `$CUSTOM_DIR_DST/conda_envs/installed/` with a name format `"pt_<DATE_STAMP>_env.yml"`
 
 ## Build Information Capture
-The `u24_Py` variant now automatically creates a `/.build_info` file containing comprehensive version information for deterministic builds. This file includes:
-- Build timestamp
-- Python version
-- Conda version
-- uv version
+Both variants automatically create a directory by name `$BUILD_INFO_DIR` (`/.build_info` by default) that has files containing comprehensive version information for deterministic builds. This file includes:
+- Build timestamp (image build time)
+- Docker image build time ARGs
+- ENV variables    
 - Oh-My-Posh version
 - Zsh version
-- Complete conda environment specifications for all installed environments
+- uv version    (`u24_py` version only)
+- Python version (`u24_py` version only)
+- Conda version (`u24_py` version only)
+- Complete conda environment specifications for all installed environments (`u24_py` version only)
 
-This enables you to recreate identical builds in the future by referencing the exact versions used.
+This enables us to recreate identical builds in the future by referencing the exact versions used.
 
 ## Version Derivation Guide
 
