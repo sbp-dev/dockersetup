@@ -59,7 +59,7 @@ RUN wget https://repo.anaconda.com/miniconda/$MINICONDA_FILE && \
     rm $MINICONDA_FILE && \
     ln -s $APP_INSTALL_DIR/miniconda3/bin/conda /$APP_INSTALL_DIR/conda && \
     ln -s $APP_INSTALL_DIR/miniconda3/bin/pip /$APP_INSTALL_DIR/pip && \
-    conda init bash && \
+    conda init --all && \
     conda clean --all -y && \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
@@ -77,52 +77,54 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 COPY "${CUSTOM_DIR_SRC}/conda_envs" "${CUSTOM_DIR_DST}/conda_envs"
 RUN mkdir -p "${CUSTOM_DIR_DST}/conda_envs/installed"
 
-################### Install latest version of each conda environment ###################
+################### Install conda environments (latest and pinned versions) ###################
 ARG INSTALL_CONDA_ENVS_LATEST=""
-
-RUN set -e && \
-    if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ]; then \
-        echo "Installing Conda environments: ${INSTALL_CONDA_ENVS_LATEST}"; \
-        for env_name in ${INSTALL_CONDA_ENVS_LATEST}; do \
-            ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/latest/${env_name}_env.yml"; \
-            ENV_FILE_TO_EXPORT="${CUSTOM_DIR_DST}/conda_envs/installed/${env_name}_env_$(date -u +"%Y%m%d").yml"; \
-            if [ -f "$ENV_FILE" ]; then \
-                echo "Creating environment '$env_name' from '$ENV_FILE'"; \
-                conda env create -f "$ENV_FILE" --yes; \
-                echo "Exporting environment '$env_name' to ${CUSTOM_DIR_DST}/conda_envs/installed/ directory"; \
-                conda env export -n "$env_name" > "$ENV_FILE_TO_EXPORT"; \
-            else \
-                echo "Warning: Environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
-            fi; \
-        done; \
-        echo "Cleaning Conda cache after all environments are installed."; \
-        conda clean --all -y; \
-        pip cache purge; \
-    else \
-        echo "No specific Conda environments requested via INSTALL_CONDA_ENVS_LATEST. Skipping environment creation."; \
-    fi
-
-################### Install pinned version of each conda environment ###################
 ARG INSTALL_CONDA_ENVS_PINNED=""
 
 RUN set -e && \
-    if [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
-        echo "Installing Conda environments: ${INSTALL_CONDA_ENVS_PINNED}"; \
-        for env_name in ${INSTALL_CONDA_ENVS_PINNED}; do \
-            ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/pinned/${env_name}_env.yml"; \
-            if [ -f "$ENV_FILE" ]; then \
-                echo "Creating environment '$env_name' from '$ENV_FILE'"; \
-                conda env create -f "$ENV_FILE" --yes; \
-                cp ${ENV_FILE} ${CUSTOM_DIR_DST}/conda_envs/installed/; \
-            else \
-                echo "Warning: Environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
-            fi; \
-        done; \
+    if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ] || [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
+        echo "Installing Conda environments:"; \
+        echo "Latest: ${INSTALL_CONDA_ENVS_LATEST}"; \
+        echo "Pinned: ${INSTALL_CONDA_ENVS_PINNED}"; \
+        \
+        # Install latest environments \
+        if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ]; then \
+            for env_name in ${INSTALL_CONDA_ENVS_LATEST}; do \
+                ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/latest/${env_name}_env.yml"; \
+                ENV_FILE_TO_EXPORT="${CUSTOM_DIR_DST}/conda_envs/installed/${env_name}_env_$(date -u +"%Y%m%d").yml"; \
+                if [ -f "$ENV_FILE" ]; then \
+                    echo "Creating latest environment '$env_name' from '$ENV_FILE'"; \
+                    conda env create -f "$ENV_FILE" --yes; \
+                    echo "Exporting environment '$env_name' to ${CUSTOM_DIR_DST}/conda_envs/installed/ directory"; \
+                    conda env export -n "$env_name" > "$ENV_FILE_TO_EXPORT"; \
+                else \
+                    echo "Warning: Latest environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
+                fi; \
+            done; \
+        fi; \
+        \
+        # Install pinned environments \
+        if [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
+            for env_name in ${INSTALL_CONDA_ENVS_PINNED}; do \
+                ENV_FILE="${CUSTOM_DIR_DST}/conda_envs/pinned/${env_name}_env.yml"; \
+                ENV_FILE_TO_EXPORT="${CUSTOM_DIR_DST}/conda_envs/installed/${env_name}_env_$(date -u +"%Y%m%d").yml"; \
+                if [ -f "$ENV_FILE" ]; then \
+                    echo "Creating pinned environment '$env_name' from '$ENV_FILE'"; \
+                    conda env create -f "$ENV_FILE" --yes; \
+                    echo "Exporting environment '$env_name' to ${CUSTOM_DIR_DST}/conda_envs/installed/ directory"; \
+                    conda env export -n "$env_name" > "$ENV_FILE_TO_EXPORT"; \
+                    # cp ${ENV_FILE} ${CUSTOM_DIR_DST}/conda_envs/installed/; \
+                else \
+                    echo "Warning: Pinned environment file '$ENV_FILE' not found for '$env_name'. Skipping."; \
+                fi; \
+            done; \
+        fi; \
+        \
         echo "Cleaning Conda cache after all environments are installed."; \
         conda clean --all -y; \
         pip cache purge; \
     else \
-        echo "No specific Conda environments requested via INSTALL_CONDA_ENVS_PINNED. Skipping environment creation."; \
+        echo "No Conda environments requested via INSTALL_CONDA_ENVS_LATEST or INSTALL_CONDA_ENVS_PINNED. Skipping environment creation."; \
     fi
 
 ################### Create build info file for deterministic builds ###################
