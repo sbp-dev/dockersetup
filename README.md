@@ -45,10 +45,10 @@ docker build \
   -t u24:$(date -u +"%Y%m%d") \
   -f .\Dockerfile_u24 .
 ```
-```cmd
-REM Windows CMD
-docker build ^
-  -t u24:$(date -u +"%Y%m%d") ^
+```powershell
+# PowerShell
+docker build `
+  -t u24:$(Get-Date -Format "yyyyMMdd") `
   -f .\Dockerfile_u24 .
 ```
 The above command will create an image with the following:
@@ -62,10 +62,10 @@ docker build \
   -t u24_py:$(date -u +"%Y%m%d") \
   -f .\Dockerfile_u24_Py .
 ```
-```cmd
-REM Windows CMD
-docker build ^
-  -t u24_py:$(date -u +"%Y%m%d") ^
+```powershell
+# PowerShell
+docker build `
+  -t u24_py:$(Get-Date -Format "yyyyMMdd") `
   -f .\Dockerfile_u24_Py .
 ```
 The above command will create an image with the following:
@@ -81,18 +81,35 @@ docker build \
   --build-arg INSTALL_CONDA_ENVS_PINNED="ml_20251027" \
   -f .\Dockerfile_u24_Py .
 ```
-```cmd
-REM Windows CMD
-docker build ^
-  -t u24_py_dl:$(date -u +"%Y%m%d") ^
-  --build-arg INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest" ^
-  --build-arg INSTALL_CONDA_ENVS_PINNED="ml_20251027" ^
+```powershell
+# PowerShell
+docker build `
+  -t u24_py_dl:$(Get-Date -Format "yyyyMMdd") `
+  --build-arg INSTALL_CONDA_ENVS_LATEST="pt_latest tf_latest" `
+  --build-arg INSTALL_CONDA_ENVS_PINNED="ml_20251027" `
   -f .\Dockerfile_u24_Py .
 ```
 The above command will create an image with the following:
 - Name `u24_py_dl:<UTC_DATE>`
 - Automatically install two conda environments from the files `pt_latest_env.yml` and `tf_latest_env.yml` in `$CUSTOM_DIR_DST/conda_envs/latest/` directory
 - Automatically install another conda environment from the file `ml_20251027_env.yml` in `$CUSTOM_DIR_DST/conda_envs/pinned/` directory <br>
+
+### Example 4: Include Azure CLI with ML Extension (optional)
+```bash
+# bash
+docker build \
+  -t u24_py_az:$(date -u +"%Y%m%d") \
+  --build-arg INSTALL_AZURE_CLI=true \
+  -f .\Dockerfile_u24_Py .
+```
+```powershell
+# PowerShell
+docker build `
+  -t u24_py_az:$(Get-Date -Format "yyyyMMdd") `
+  --build-arg INSTALL_AZURE_CLI=true `
+  -f .\Dockerfile_u24_Py .
+```
+This example installs the Azure CLI along with the Azure ML extension during the image build so you can run `az` commands immediately after launching a container. The build info summary captures the Azure CLI version for deterministic rebuilds when this flag is enabled.
 
 **NOTE:** In the container, the actual name of the installed Conda environments may not be the same as `pt_latest` etc. since it will be picked up from the `name` field in the YML files
 

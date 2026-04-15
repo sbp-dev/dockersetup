@@ -11,6 +11,7 @@ ARG CUSTOM_DIR_SRC='../image_customizations'
 ARG CUSTOM_DIR_DST="/shadowbox"
 ARG APP_INSTALL_DIR="/usr/bin"
 ARG BUILD_INFO_DIR="/.build_info"
+ARG INSTALL_AZURE_CLI=false
 
 ################### Install essential CLI tools ###################
 RUN apt-get update && \
@@ -128,6 +129,18 @@ RUN set -e && \
         echo "No Conda environments requested via INSTALL_CONDA_ENVS_LATEST or INSTALL_CONDA_ENVS_PINNED. Skipping environment creation."; \
     fi
 
+################### Install Azure CLI ###################
+RUN if [ "${INSTALL_AZURE_CLI}" = "true" ]; then \
+        echo "Installing Azure CLI..."; \
+        if curl -sL https://aka.ms/InstallAzureCLIDeb | bash && az extension add -n ml -y; then \
+            echo "Azure CLI installed successfully with ML extension."; \
+        else \
+            echo "Warning: Azure CLI installation or ML extension addition failed."; \
+        fi; \
+    else \
+        echo "Skipping Azure CLI installation."; \
+    fi
+
 ################### Create build info file for deterministic builds ###################
 RUN mkdir -p ${BUILD_INFO_DIR} && \
     { \
@@ -142,6 +155,7 @@ RUN mkdir -p ${BUILD_INFO_DIR} && \
         echo "MINICONDA_FILE: ${MINICONDA_FILE}"; \
         echo "INSTALL_CONDA_ENVS_LATEST: ${INSTALL_CONDA_ENVS_LATEST}"; \
         echo "INSTALL_CONDA_ENVS_PINNED: ${INSTALL_CONDA_ENVS_PINNED}"; \
+        echo "INSTALL_AZURE_CLI: ${INSTALL_AZURE_CLI}"; \
         echo ""; \
         echo "========== ENV Variables =========="; \
         echo "PYTHONPATH: ${PYTHONPATH}"; \
@@ -162,6 +176,15 @@ RUN mkdir -p ${BUILD_INFO_DIR} && \
         echo "Zsh Version:"; \
         zsh --version 2>&1; \
         echo ""; \
+        if [ "${INSTALL_AZURE_CLI}" = "true" ]; then \
+            echo "Azure CLI Version:"; \
+            if command -v az >/dev/null 2>&1; then \
+                az --version 2>&1; \
+            else \
+                echo "Azure CLI binary not found."; \
+            fi; \
+            echo ""; \
+        fi; \
         echo "========== Installed Conda Environments =========="; \
         if [ -n "${INSTALL_CONDA_ENVS_LATEST}" ] || [ -n "${INSTALL_CONDA_ENVS_PINNED}" ]; then \
             echo "Latest Environments: ${INSTALL_CONDA_ENVS_LATEST}"; \
