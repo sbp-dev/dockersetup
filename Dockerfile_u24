@@ -8,7 +8,7 @@ ENV IMAGE_TAG=${IMAGE_TAG}
 
 ################## Other ARGs ################
 ARG CUSTOM_DIR_SRC='../image_customizations'
-ARG CUSTOM_DIR_DST="/fhai"
+ARG CUSTOM_DIR_DST="/shadowbox"
 ARG APP_INSTALL_DIR="/usr/bin"
 ARG BUILD_INFO_DIR="/.build_info"
 
